@@ -91,7 +91,195 @@ You can test for row_no.is_first() in your function and skip if True.
         return return_val
 
 
-class Blob:  # v 2.4.0
+class Config:  # v 3.0.1
+    main_specs = {}
+    file_path = {}
+
+    # Immutable attributes (cannot be modified after assignment)
+    class ImmutableDict(dict):
+        def __setitem__(self, key, value):
+            raise TypeError("This dictionary is immutable and cannot be changed.")
+
+        def __delitem__(self, key):
+            raise TypeError("This dictionary is immutable and cannot be changed.")
+
+        def clear(self):
+            raise TypeError("This dictionary is immutable and cannot be cleared.")
+
+        def update(self, *args, **kwargs):
+            raise TypeError("This dictionary is immutable and cannot be updated.")
+
+        def pop(self, key, default=None):
+            raise TypeError("This dictionary is immutable and cannot be changed.")
+
+        def popitem(self):
+            raise TypeError("This dictionary is immutable and cannot be changed.")
+
+        def setdefault(self, key, default=None):
+            raise TypeError("This dictionary is immutable and cannot be changed.")
+
+    class ImmutableList(list):
+        def __setitem__(self, index, value):
+            raise TypeError("This list is immutable and cannot be changed.")
+
+        def __delitem__(self, index):
+            raise TypeError("This list is immutable and cannot be deleted.")
+
+        def append(self, value):
+            raise TypeError("This list is immutable and cannot be changed.")
+
+        def extend(self, iterable):
+            raise TypeError("This list is immutable and cannot be extended.")
+
+        def insert(self, index, value):
+            raise TypeError("This list is immutable and cannot be changed.")
+
+        def remove(self, value):
+            raise TypeError("This list is immutable and cannot be changed.")
+
+        def pop(self, index=-1):
+            raise TypeError("This list is immutable and cannot be changed.")
+
+        def clear(self):
+            raise TypeError("This list is immutable and cannot be cleared.")
+
+    def __init__(self, settings=None, settings_file_url=None):
+        """
+The Config class is a custom object for setting global variables in a way that is more controllable and therefore more
+predictable. Usually instantiated as the *ini* object, Config contains both mutable and immutable objects. Immutable
+objects prevent devs inadvertently overwriting the value of list or dictionary item, thus averting the classic problem
+with global variables. Although they do offer a limited layer of security, they should not be considered secure.
+        """
+        if settings_file_url:
+            import sys
+            import importlib
+            import pathlib
+            file_path = pathlib.Path(settings_file_url)
+            sys.path.insert(0, str(file_path.parent))
+            global_app_settings = importlib.import_module(file_path.stem)
+
+            # import everything global_app_settings defines into the current namespace
+            app_settings = {}
+            for name in dir(global_app_settings):
+                if not name.startswith("_"):
+                    app_settings[name] = getattr(global_app_settings, name)
+            self.__APP_SETTINGS = Config.ImmutableDict(app_settings)
+        elif isinstance(settings, dict):
+            self.__APP_SETTINGS = Config.ImmutableDict(settings)
+
+        self.app_log = LogManager(application_error_log=self.__APP_SETTINGS.get('ApplicationErrorLog'))
+        self.api_log = LogManager(application_error_log=self.__APP_SETTINGS.get('ApplicationErrorLog'))
+
+        self.job_specs = {}
+        self.verbose_logging = False
+        self.multi_threaded_mode = False
+
+        run_mode = self.__APP_SETTINGS.get('AppMode')
+        if run_mode == 'development':
+            self.verbose_logging = True
+            postcode_areas = self.__APP_SETTINGS.get('DevPostcodeAreas')
+        elif run_mode == 'testing':
+            postcode_areas = self.__APP_SETTINGS.get('TestPostcodeAreas')
+        else:
+            postcode_areas = self.__APP_SETTINGS.get('PostcodeAreas')
+        postcode_area_list = postcode_areas if isinstance(postcode_areas, list) else \
+            [j for i in list(postcode_areas[x] for x in postcode_areas) for j in i]
+
+        self._PCA_LIST = Config.ImmutableList(postcode_area_list)
+        self._API_SERVERS = Config.ImmutableList(self.set_apis(self.__APP_SETTINGS.get('ApiServerInfo')))
+
+
+    # Properties to access immutable attributes without allowing modification
+    @property
+    def api_batch_size(self):
+        return self.__APP_SETTINGS.get('ApiBatchSize')
+
+    @property
+    def api_retries(self):
+        return self.__APP_SETTINGS.get('ApiRetryLimit')
+
+    @property
+    def api_servers(self):
+        return self._API_SERVERS
+
+    @property
+    def application_log(self):
+        return os.path.join(self.__APP_SETTINGS.get('ApplicationsFolder'),
+                            self.__APP_SETTINGS.get('ApplicationLogsFolder'),
+                            self.__APP_SETTINGS.get('ApplicationName') + '.log')
+
+    @property
+    def application_path(self):
+        return os.path.join(self.__APP_SETTINGS.get('ApplicationsFolder'),
+                            self.__APP_SETTINGS.get('AppMode'),
+                            self.__APP_SETTINGS.get('ApplicationName)'))
+
+    @property
+    def check_row_count(self):
+        return self.__APP_SETTINGS.get('FileFormatCheckRowCount')
+
+    @property
+    def chunk_size(self):
+        return self.__APP_SETTINGS.get('FileIteratorChunkSize')
+
+    @property
+    def default_delimiter(self):
+        return self.__APP_SETTINGS.get('DefaultDelimiter')
+
+    @property
+    def default_output_fields(self):
+        return self.__APP_SETTINGS.get('DefaultOutFields')
+
+    @property
+    def file_spec_version(self):
+        return self.__APP_SETTINGS.get('FileSpecVersion')
+
+    @property
+    def index_ext(self):
+        return self.__APP_SETTINGS.get('IndexFileExtn')
+
+    @property
+    def index_field(self):
+        return self.__APP_SETTINGS.get('InternalUidFieldName')
+
+    @property
+    def postcode_area_list(self):
+        return self._PCA_LIST
+
+    @property
+    def refiner_postcode_field(self):
+        return self.__APP_SETTINGS.get('RefinerPostcodeField')
+
+    @property
+    def refiner_output_fields(self):
+        return self.__APP_SETTINGS.get('RefinerOutputFields')
+
+    @property
+    def report_chunk_frequency(self):
+        return self.__APP_SETTINGS.get('BundleReportFrequency')
+
+    @property
+    def segment_folders(self):
+        return self.__APP_SETTINGS.get('SegmentFolders')
+
+    @property
+    def wf_supply_folder(self):
+        return self.__APP_SETTINGS.get('WhenFreshSupplyFolders')
+
+    def set_apis(self, api_server_info, refiner_request_fields=None):
+        root = r'http://{}/v1/refiner/GBR/clean?serial={}&password={}'
+        multi_threaded_mode = (len(api_server_info) > 1)
+        api_servers = []
+        for si in api_server_info:
+            api_server = ApiServer(si['name'], si['host'], si['licence'], si['password'], root, self.api_log,
+                                   multi_threaded_mode, refiner_request_fields, frmt='json')
+            if api_server.online:
+                api_servers.append(api_server)
+        print(f"{len(api_servers)} server{'' if len(api_servers) == 1 else 's'} initialised")
+        return api_servers
+
+
+class Blob:  # v 3.0.1
     idx = None
 
     def __init__(self, ini, file_type, log: LogManager, name=None, segment=False, file_spec_override=None):
@@ -154,7 +342,7 @@ A container for managing Pandas DataFrames
                 self.file_path = os.path.join(self.file_path, ini.segment_folders, self.name)
             self.volatile = self.get_file_spec('Volatile', True)
             self.archived_name = self.get_file_spec('ArchivedName', self.file_name)
-            self.data_types = self.df_fields
+            # self.data_types = self.df_fields
             # address_fields = self.field_names if file_specs['AddressFields'] == '' else file_specs['AddressFields']
             self.address_fields = self.get_file_spec('AddressFields', self.field_names)
             self.status = 'Instantiated'
@@ -170,7 +358,7 @@ A container for managing Pandas DataFrames
         out_str = out_str + f'Archived Name: {self.archived_name}\n'
         out_str = out_str + f'Table Fields:-\n{self.df_fields}\n==================\n'
         if self.loaded:
-            out_str += f'Row count: {self.row_count}\n{self.data_frame.iloc[0]}\n\n'
+            out_str += f'Row count: {self.row_count}\n{self.data_frame.iloc[0][self.field_names]}\n\n'
         else:
             out_str += self.name + ' is empty\n\n'
 
@@ -218,11 +406,11 @@ A container for managing Pandas DataFrames
             if self.file_extn.lower() in ['csv', 'txt', 'tsv', 'idx']:
                 if unicode_escape:
                     df = pd.read_csv(read_url, sep=self.separator, header=self.header, names=field_names, nrows=rows, on_bad_lines='warn',#lambda x: x[:len(self.header)],
-                                     skiprows=skiprows, dtype=self.data_types, index_col=self.idx,
+                                     skiprows=skiprows, dtype=self.df_fields, index_col=self.idx,
                                      encoding='unicode_escape', engine='python')
                 else:
                     df = pd.read_csv(read_url, sep=self.separator, header=self.header, names=field_names, nrows=rows, on_bad_lines='warn',#lambda x: x[:len(self.header)], engine='python',
-                                     skiprows=skiprows, dtype=self.data_types, index_col=self.idx,
+                                     skiprows=skiprows, dtype=self.df_fields, index_col=self.idx,
                                      encoding_errors='ignore')
             elif self.file_extn.lower() in ['xls', 'xlsx']:
                 df = pd.read_excel(read_url, nrows=rows, skiprows=skiprows)
@@ -251,66 +439,192 @@ A container for managing Pandas DataFrames
         # return ['File loaded', self, 'Data loaded into blob']
         return self.row_count
 
-    def file_iterator(self, chunksize, url=None, unicode_escape=False, archive=None):
-        if archive:
-            location = archive.get('location')
-            zip_name = archive.get('zip_name')
-            file_name = archive.get('file_list')
-            password = archive.get('password')
-            zip_url = os.path.join(location, zip_name)
+    def read_large_file(self, query_str, con=None, source=None, index=None):
+        """
+For reading files of over 100MB, this option uses duckdb to read the file.
+        :param query_str: The query string should contain one pair of curly braces to be replaced by the file path. Alternatively, this can be hard-coded.
+        :param con: Table name or full UNC file path. If none is provided, the FileType's url is used.
+        :param index: If provided, the index column is used as the DataFrame index.
+        """
+        def run_query(sql):
+            # If caller provided a connection, use it
+            if isinstance(con, duckdb.DuckDBPyConnection):
+                return con.query(sql).to_df()
+            # Otherwise, fall back to the module-level singleton
+            return duckdb.query(sql).to_df()
 
-            if not os.path.exists(zip_url):
-                msg = ['No file available', zip_url, 'No data loaded into blob']
-                self.log.create_entry(msg, new_lines=True)
-                return msg
-            input_zip = ZipFile(zip_url)
-            file_path = zip_url
-            file_stream = input_zip.read(file_name, pwd=password)
-            read_url = BytesIO(file_stream)
+        sql = query_str.format(source)
+        if index:
+            df = run_query(sql).set_index(index)
+        else:
+            df = run_query(sql)
 
-        else:
-            read_url = self.url if url is None else url
-            file_path = read_url
-            if not os.path.exists(file_path):
-                msg = ['No file available', file_path, 'No data loaded into blob']
-                self.log.create_entry(msg, new_lines=True)
-                return msg
-        field_names = self.idx.copy() if isinstance(self.idx, list) else [self.idx]
-        if self.idx:
-            field_names.extend(self.field_names)
-        else:
-            field_names = self.field_names
+        # Remove tab characters from the column names
+        df.columns = [c.replace('\t', '') for c in df.columns]
+        self.load_data(df)
+
+    def read_parquet_file(self, url=None, reset_columns=False):
+        """
+        Reads a Parquet file into a pandas DataFrame.
+        If reset_columns is True, the column names are for the Blob are reset to match the file's column names.
+        Returns an empty DataFrame if the file doesn't exist yet.
+        """
+        if url is None:
+            url = '.'.join(self.url.split('.')[0:-1]) + '.parquet'
         try:
-            if unicode_escape:
-                df = pd.read_csv(read_url, sep=self.separator, header=self.header, names=field_names,
-                                 chunksize=chunksize, dtype=self.data_types, index_col=self.idx,
-                                 encoding='unicode_escape', engine='python')
-            else:
-                df = pd.read_csv(read_url, sep=self.separator, header=self.header, names=field_names,
-                                 chunksize=chunksize, dtype=self.data_types, index_col=self.idx,
-                                 encoding_errors='ignore')
-            return df
-        except KeyError:
-            msg = ['Key error', self, 'No data loaded']
-            self.log.create_entry(msg, new_lines=True)
-            return msg
-        except ValueError:
-            e = traceback.format_exc()
-            msg = ['FileSpec error', self, 'No data loaded']
-            self.log.create_entry(msg, new_lines=True)
-            self.log.create_entry(e, new_lines=True)
-            return msg
+            df = pd.read_parquet(url)
+            if reset_columns:
+                self.field_names = list(df.columns)
+                self.df_fields = df.dtypes
+            self.load_data(df)
         except FileNotFoundError:
-            e = traceback.format_exc()
-            self.log.create_entry(e, new_lines=True)
-            msg = ['Read error', file_path, 'No data loaded']
+            msg = ['Read error', url, 'No data loaded into blob', f'Parquet file not found: {url}']
             self.log.create_entry(msg, new_lines=True)
+            return pd.DataFrame()
+        return df
+
+    def read_zip_file(self, archive: dict, query_str, unicode_escape=False):
+        """
+For reading files of over 100MB, this option uses duckdb to read the file.
+        :param archive: dict containing location, zip_name, file_list, password.
+        :param query_str: The query string should contain one pair of curly braces to be replaced by the file path. Alternatively, this can be hard-coded.
+        :param url: Full UNC file path. If none is provided, the FileType's url is used.
+        :param index: If provided, the index column is used as the DataFrame index.
+        """
+        location = archive.get('location')
+        zip_name = archive.get('zip_name')
+        file_name_list = archive.get('file_list')
+        password = archive.get('password')
+        zip_url = os.path.join(location, zip_name)
+
+        # Read from ZIP entirely in memory
+        df_list = []
+        with ZipFile(zip_url) as input_zip:
+            try:
+                # --- Initialize DuckDB connection ---
+                con = duckdb.connect()
+                for file_name in file_name_list:
+                    file_stream = input_zip.read(file_name, pwd=password)
+                    encoding = 'utf-8' if not unicode_escape else 'unicode_escape'
+                    read_data = StringIO(file_stream.decode(encoding, errors='ignore'))
+
+                    if read_data:
+                        # Reset to start of stream each batch
+                        read_data.seek(0)
+
+                        # Create a DuckDB relation from the CSV stream
+                        rel = con.read_csv(read_data, sep=self.separator, header=self.header)
+
+                        # Register it as a temporary view
+                        con.register('input_stream', rel)
+
+                        query = f"""
+                            SELECT * 
+                            FROM input_stream
+                            {query_str}
+                        """
+                    df_file = con.execute(query).fetchdf()
+                    if df_file.empty:
+                        break
+                    if self.idx:
+                        df_file.set_index(self.idx, inplace=True)
+                    df_list.append(df_file)
+            except Exception as e:
+                self.log.create_entry([str(e)], new_lines=True)
+            finally:
+                # --- Clean up memory before next file ---
+                try:
+                    if read_data:
+                        read_data.close()
+                        del read_data
+                    if file_stream:
+                        del file_stream
+                    if con:
+                        con.close()
+                except Exception:
+                    pass  # ignore cleanup errors
+
+                # optional: force garbage collection for large files
+                gc.collect()
+
+        if len(df_list) > 1:
+            self.load_data(pd.concat(df_list))
+        elif len(df_list) == 1:
+            self.load_data(df_list[0])
+
+    def file_iterator(self, chunksize, url=None, unicode_escape=False, archive=None):
+        try:
+            # --- Resolve file source ---
+            if archive:
+                location = archive.get('location')
+                zip_name = archive.get('zip_name')
+                file_name = archive.get('file_list')
+                password = archive.get('password')
+                zip_url = os.path.join(location, zip_name)
+
+                if not os.path.exists(zip_url):
+                    msg = ['No file available', zip_url, 'No data loaded into blob']
+                    self.log.create_entry(msg, new_lines=True)
+                    return msg
+
+                # Read from ZIP entirely in memory
+                with ZipFile(zip_url) as input_zip:
+                    file_stream = input_zip.read(file_name, pwd=password)
+                read_url = BytesIO(file_stream)
+                file_path = f'memory_csv_{os.path.basename(file_name)}'
+            else:
+                read_url = self.url if url is None else url
+                file_path = read_url
+                if not os.path.exists(file_path):
+                    msg = ['No file available', file_path, 'No data loaded into blob']
+                    self.log.create_entry(msg, new_lines=True)
+                    return msg
+
+            # --- Determine column names ---
+            field_names = self.idx.copy() if isinstance(self.idx, list) else [self.idx]
+            if self.idx:
+                field_names.extend(self.field_names)
+            else:
+                field_names = self.field_names
+
+            # --- Initialize DuckDB connection ---
+            con = duckdb.connect()
+
+            # If it's an in-memory ZIP, register the bytes as a virtual file
+            if isinstance(read_url, BytesIO):
+                con.register('input_stream', read_url)
+
+            # --- Batch generator ---
+            offset = 0
+            while True:
+                # DuckDB automatically handles both local files and registered in-memory streams
+                source = 'input_stream' if isinstance(read_url, BytesIO) else f"'{file_path}'"
+                query = f"""
+                    SELECT * FROM read_csv_auto({source}, delim='{self.separator}', header={bool(self.header)})
+                    LIMIT {chunksize} OFFSET {offset}
+                """
+                df = con.execute(query).fetchdf()
+                if df.empty:
+                    break
+                if self.idx:
+                    df.set_index(self.idx, inplace=True)
+                yield df
+                offset += chunksize
+
+        except (KeyError, ValueError, FileNotFoundError) as e:
+            err = traceback.format_exc()
+            msg = [type(e).__name__, self, 'No data loaded']
+            self.log.create_entry(msg, new_lines=True)
+            self.log.create_entry(err, new_lines=True)
             return msg
 
-    def load_data(self, df, copy=False):
+    def load_data(self, df, copy=True):
         if df.shape[0] > 0:
-            self.data_frame = df.copy() if copy else df
-            self.data_frame.fillna('', inplace=True)
+            if copy:
+                self.data_frame = df.fillna('')
+            else:
+                self.data_frame = df
+                self.data_frame.fillna('', inplace=True)
             self.index_min = self.data_frame.index.min()
             self.row_count = df.shape[0]
             self.index_max = self.data_frame.index.max()
@@ -358,6 +672,15 @@ A container for managing Pandas DataFrames
         else:
             self.log.create_entry(['Blob Output', self.file_type, 'No data', out_url])
         self.rw_log.create_entry(['Write', self.file_type, self.name, out_url, self.row_count])
+
+    def write_parquet_file(self, url=None, index=False):
+        """
+        Writes a pandas DataFrame to a Parquet file, overwriting if it already exists.
+        """
+        if url is None:
+            url = '.'.join(self.url.split('.')[0:-1]) + '.parquet'
+        self.data_frame[self.field_names].to_parquet(url, engine="pyarrow", index=index, compression="snappy")
+        self.log.create_entry([f"{self.row_count} rows written", url])
 
     def update_url(self, place_holder=None, var_string=None, file_name=None, file_path=None, permanent=False):
         path = self.file_path if file_path is None else file_path
@@ -443,7 +766,7 @@ inplace=True
         """
         self.df_fields = new_fields
         self.field_names = list(self.df_fields.keys())
-        self.data_types = self.df_fields
+        # self.data_types = self.df_fields
 
         if transform_method:
             self.transform(transform_method, **kwargs)
@@ -487,6 +810,36 @@ inplace=True
             self.data_frame.sort_values(by=sort_fields, ascending=sort_order, inplace=True)
         else:
             self.data_frame.sort_values(by=sort_fields, inplace=True)
+
+    def refine_addresses(self, remove_errors=True):
+        """
+*An AFD Refiner licence is required to use this function.*\n
+Parses data through an AFD Refiner API service to enhance addresses in the blob.data_frame. blob.data_frame is updated
+to include a UDPRN & UPRN field. If remove_errors is True, only addresses with a valid UDPRN are included in blob.data_frame,
+but all rows are returned by this function to allow for further processing.
+        :param remove_errors: bool, if True, all rows without a UDPRN are removed from the blob.data_frame
+        :return: DataFrame, unfiltered with UDPRN & UPRN added
+        """
+        t_rows = self.row_count
+        df_refiner = check_data_frame(self.ini, self.data_frame, self.address_fields)  # .iloc[0:2000].copy()
+        df_merged = df_refiner[['UDPRN', 'UPRN']].merge(
+            self.data_frame,
+            left_index=True,
+            right_index=True,
+            how='inner'
+        )
+        if remove_errors:
+            self.load_data(df_merged[df_merged['UDPRN'] != '00000000'].copy())
+        else:
+            self.load_data(df_merged)
+        self.field_names.insert(0, 'UPRN')
+        self.field_names.insert(0, 'UDPRN')
+        self.df_fields['UDPRN'] = str
+        self.df_fields['UPRN'] = str
+        self.log.create_entry(['Refiner',
+                               f'{t_rows} rows submitted',
+                               f"{df_merged[df_merged['UDPRN'] == '00000000'].shape[0]} rows {'dropped' if remove_errors else 'with no UDPRN'}"])
+        return df_merged
 
     def apply(self, function, *args):
         df = self.data_frame.apply(lambda r: function(r, *args), axis=1)
@@ -590,3 +943,4 @@ Generates a File Layout in a CSV file, based on the metadata, not the DataFrame
 
         out_str += '</table>\n'
         return out_str
+
