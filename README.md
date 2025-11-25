@@ -17,13 +17,13 @@ Generally instatiated as the *ini* object, the **Config** class is intended to h
 settings and runtime specific variables, such as file names and data structures.
 #### job-specs
 In the base Config class, job_specs is an empty dict. To create a Blob object, you will need to add the following values:- 
-Description - str: an internal description of the data 
-FileName - str: file name with extension
-Separator - str: delimeter char(s), eg ','
-Columns - list of str: column names
-AddressFields - list of str: names of columns containing address data
-Volatile - bool: if a file is non-volatile, it may be locked against certain operations
-IndexColumn - str: the name of the index column
-Header - int: zero based index of the the header row
-StatisticsColumns - list of str: column names uses for statistical and sorting purposes 
-Location - str: the full unc path to the parent folder of the file
+- Description - str: an internal description of the data 
+- FileName - str: file name with extension
+- Separator - str: delimeter char(s), eg ','
+- Columns - list of str: column names
+- AddressFields - list of str: names of columns containing address data
+- Volatile - bool: if a file is non-volatile, it may be locked against certain operations
+- IndexColumn - str: the name of the index column
+- Header - int: zero based index of the the header row
+- StatisticsColumns - list of str: column names uses for statistical and sorting purposes 
+- Location - str: the full unc path to the parent folder of the file
