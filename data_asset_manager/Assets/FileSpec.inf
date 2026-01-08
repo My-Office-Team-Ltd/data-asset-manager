@@ -1,0 +1,20 @@
+Version: 2.0.1
+Status: Development
+ClientId: INTE01
+ClientName: Internal
+
+FileSpec: Default
+Description: NN Dataset 1
+InFileName: DTD_NN_Output_2000_2025.csv
+HeaderStyle: Strict
+InFields: DT_PC,Firstname,initial,surname,udprn,in1,out1
+FieldTypes: str
+InDelimiter: ,
+IndexFields: None
+InAddressFields: DT_PC
+PostcodeField: DT_PC
+IntFields: Firstname,initial,surname,udprn,in1,out1
+FileType: CSV
+Subroutines: None
+SrStep: 1
+SrArguments: None
