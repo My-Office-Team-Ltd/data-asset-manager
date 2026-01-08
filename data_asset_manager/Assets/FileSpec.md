@@ -21,6 +21,11 @@
 
       FileSpec: Default
 
+## Description
+- An internal description of the dataset for reference only.
+
+      Description: NN Dataset 1
+
 ## Input File Name
 - Enter the value [file_id] for InFileName to set the value within Python.
 - if job type is Multi, this becomes a folder location
