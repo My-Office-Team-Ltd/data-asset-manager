@@ -14,10 +14,10 @@
       Owner: Test Client
 
 ## File Spec
-- Default: runs a single file
-- Multi: runs multiple files stored in a folder, which is taken from InFileName
-- Archive: runs multiple files directly fom a compressed archive, for which the file name is taken from InFileName
-- In the case of both Multi and Archive, all the files found are run. There is currently no way to override the individual file names
+- An identifier for a specific file.
+- Also determines the start of the settings for this file type.
+- Multiple FileSpecs can be defined, but each must have its own set of attributes.
+- Attributes end when the next FileSpec is reached.
 
       FileSpec: Default
 
