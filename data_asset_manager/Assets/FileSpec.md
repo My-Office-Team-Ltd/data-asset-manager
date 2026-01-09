@@ -32,6 +32,12 @@
 
       InFileName: All
 
+## Root Folder
+- Enter the value [file_id] for InFileName to set the value within Python.
+- if job type is Multi, this becomes a folder location
+
+      RootFolder: D:\\DataStore
+
 ## Header Row
 - Strict: Checks to make sure Field Names match those listed below
 - Loose: Checks to ensure the correct number of fields but ignores the first line of the Input File
