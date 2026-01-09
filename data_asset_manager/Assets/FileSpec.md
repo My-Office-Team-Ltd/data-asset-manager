@@ -10,8 +10,8 @@
 - Set Status to Development to enable verbose_logging and disable email sending
 
       Status: Development
-      ClientId: TC
-      ClientName: Test Client
+      OwnerId: TC
+      Owner: Test Client
 
 ## File Spec
 - Default: runs a single file
